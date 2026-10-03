@@ -56,4 +56,4 @@ scaler.pkl: The saved StandardScaler used to normalize the 19 required cooling s
 
 model.pkl: The saved IsolationForest model used for anomaly detection. (Must be provided)
 
-Author / Maintainer: Sumit Singh On Youtube_:(@SinghSahabTrades)
+Author / Maintainer: Sumit Singh On Youtube_:(@thetechysumit)
