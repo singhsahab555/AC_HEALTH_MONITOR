@@ -79,6 +79,9 @@ CREATE INDEX IF NOT EXISTS idx_ac_anomaly_cycle_start
     ON ac_anomaly_results(cycle_start DESC);
 CREATE INDEX IF NOT EXISTS idx_ac_anomaly_level
     ON ac_anomaly_results(anomaly_level);
+-- One row per cycle: write_results() upserts on this key
+CREATE UNIQUE INDEX IF NOT EXISTS uq_ac_anomaly_cycle
+    ON ac_anomaly_results(ac_id, cycle_start);
 
 -- Forecast table
 CREATE TABLE IF NOT EXISTS ac_forecasts (
@@ -92,6 +95,9 @@ CREATE TABLE IF NOT EXISTS ac_forecasts (
     predicted_anomaly SMALLINT DEFAULT 0,
     created_at  TIMESTAMPTZ DEFAULT NOW()
 );
+-- One forecast point per AC/metric/time: write_forecasts() upserts on this key
+CREATE UNIQUE INDEX IF NOT EXISTS uq_ac_forecast_point
+    ON ac_forecasts(ac_id, metric, ds);
 
 -- Health report (per AC per run)
 CREATE TABLE IF NOT EXISTS ac_health_report (
@@ -152,19 +158,42 @@ def write_results(df: pd.DataFrame, conn_str: str = CONN_STR,
         "short_cycle_flag", "poor_cooling_flag", "high_stress_flag",
     ]
     available = [c for c in cols if c in df.columns]
-    df[available].to_sql(
+    out = (df[available]
+           .dropna(subset=list(RESULTS_KEY))
+           .drop_duplicates(subset=list(RESULTS_KEY), keep="last"))
+    out.to_sql(
         "ac_anomaly_results", engine,
-        if_exists=if_exists, index=False, chunksize=500, method="multi",
+        if_exists="append", index=False, chunksize=500, method=_upsert_on(RESULTS_KEY),
     )
-    print(f"✅ Written {len(df)} rows to ac_anomaly_results")
+    print(f"✅ Upserted {len(out)} rows into ac_anomaly_results")
+
+
+RESULTS_KEY  = ("ac_id", "cycle_start")
+FORECAST_KEY = ("ac_id", "metric", "ds")
+
+
+def _upsert_on(key: tuple):
+    """Build a pandas to_sql insert method: INSERT … ON CONFLICT (key) DO UPDATE.
+    Re-running the engine refreshes existing rows instead of appending copies."""
+    def method(table, conn, keys, data_iter):
+        rows = [dict(zip(keys, r)) for r in data_iter]
+        if not rows:
+            return
+        stmt = insert(table.table).values(rows)
+        update = {c: stmt.excluded[c] for c in keys if c not in key}
+        conn.execute(stmt.on_conflict_do_update(index_elements=list(key), set_=update))
+    return method
 
 
 def write_forecasts(fc: pd.DataFrame, conn_str: str = CONN_STR) -> None:
     if fc.empty:
         return
     engine = create_engine(conn_str)
-    fc.to_sql("ac_forecasts", engine, if_exists="append", index=False, chunksize=500)
-    print(f"✅ Written {len(fc)} forecast rows")
+    out = (fc.dropna(subset=list(FORECAST_KEY))
+             .drop_duplicates(subset=list(FORECAST_KEY), keep="last"))
+    out.to_sql("ac_forecasts", engine, if_exists="append", index=False,
+               chunksize=500, method=_upsert_on(FORECAST_KEY))
+    print(f"✅ Upserted {len(out)} forecast rows")
 
 
 def write_report(report: pd.DataFrame, conn_str: str = CONN_STR) -> None:
