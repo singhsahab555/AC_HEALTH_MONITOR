@@ -1,0 +1,52 @@
+api:
+  base_url: "https://iotscada.co.in:1880"
+  api_key:  ""
+  timeout_seconds: 160
+  endpoints:
+    history: "/ac/history"
+  date_range_mode: "yesterday"
+  ac_unit_ids:
+    - ""
+  env_unit_ids:
+    - ""
+  extra_headers:
+    Accept: "application/json"
+
+pipeline:
+  ac_id:   ""
+  season:  "summer"
+  voltage: 230
+
+database:
+  host:     "localhost"
+  port:     5432
+  dbname:   "ac_automation"
+  user:     "postgres"
+  password: ""          # leave empty — set Windows user env var AC_PG_PASSWORD instead
+  schema:   "public"
+  tables:
+    raw_sensor:      "ac_raw_sensor_data"
+    raw_environment: "ac_raw_environment"
+    health_metrics:  "ac_health_metrics"
+    runtime_cycles:  "ac_runtime_cycles"
+    anomaly_results: "ac_anomaly_results"
+    forecasts:       "ac_forecasts"
+    health_report:   "ac_health_report"
+    alarms:          "ac_alarms"
+
+paths:
+  data_dir:    "data"
+  output_dir:  "output"
+  logs_dir:    "logs"
+  models_dir:  "models"
+  scripts_dir: "scripts"
+
+notifications:
+  enabled: false
+  smtp_host:    "smtp.gmail.com"
+  smtp_port:    587
+  smtp_user:    "you@gmail.com"
+  smtp_pass:    "YOUR_APP_PASSWORD"
+  notify_to:    "you@gmail.com"
+  notify_on_critical: true
+  notify_on_failure:  true

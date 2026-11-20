@@ -1,0 +1,11 @@
+# Data & generated artifacts (large / regenerated daily)
+data/
+logs/
+output/
+models/
+# Secrets
+dashboard/.streamlit/secrets.toml
+.env
+# Python
+__pycache__/
+*.pyc
